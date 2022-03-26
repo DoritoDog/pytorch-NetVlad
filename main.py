@@ -181,11 +181,16 @@ def test(eval_set, epoch=0, write_tboard=False):
         if opt.pooling.lower() == 'netvlad': pool_size *= opt.num_clusters
         dbFeat = np.empty((len(eval_set), pool_size))
 
+        # iteration is the index of the iteration.
+        # input has the shape [24, 3, 480, 640].
+        # indices is tensor([ 0, 1, 2, ... 23]).
         for iteration, (input, indices) in enumerate(test_data_loader, 1):
             input = input.to(device)
             image_encoding = model.encoder(input)
             vlad_encoding = model.pool(image_encoding) 
 
+            # dbFeat has the shape (16816, 32768).
+            # dbFeat[indices.detach().numpy(), :] has the shape (24, 32768)
             dbFeat[indices.detach().numpy(), :] = vlad_encoding.detach().cpu().numpy()
             if iteration % 50 == 0 or len(test_data_loader) <= 10:
                 print("==> Batch ({}/{})".format(iteration, 
@@ -195,8 +200,10 @@ def test(eval_set, epoch=0, write_tboard=False):
     del test_data_loader
 
     # extracted for both db and query, now split in own sets
-    qFeat = dbFeat[eval_set.dbStruct.numDb:].astype('float32')
-    dbFeat = dbFeat[:eval_set.dbStruct.numDb].astype('float32')
+    #qFeat = dbFeat[eval_set.dbStruct.numDb:].astype('float32')
+    #dbFeat = dbFeat[:eval_set.dbStruct.numDb].astype('float32')
+    qFeat = dbFeat.astype('float32')
+    dbFeat = dbFeat.astype('float32')
     
     print('====> Building faiss index')
     faiss_index = faiss.IndexFlatL2(pool_size)
