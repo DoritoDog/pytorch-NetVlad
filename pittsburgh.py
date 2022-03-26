@@ -1,3 +1,6 @@
+# Configuration is done in the corresponding .mat file.
+# Reading config from .mat is done in parse_dbStruct().
+
 import torch
 import torchvision.transforms as transforms
 import torch.utils.data as data
@@ -12,7 +15,7 @@ from PIL import Image
 from sklearn.neighbors import NearestNeighbors
 import h5py
 
-root_dir = '/nfs/ibrahimi/data/pittsburgh/'
+root_dir = '/content/pytorch-NetVlad/'
 if not exists(root_dir):
     raise FileNotFoundError('root_dir is hardcoded, please adjust to point to Pittsburth dataset')
 
@@ -73,6 +76,7 @@ dbStruct = namedtuple('dbStruct', ['whichSet', 'dataset',
 def parse_dbStruct(path):
     mat = loadmat(path)
     matStruct = mat['dbStruct'].item()
+    print(matStruct)
 
     if '250k' in path.split('/')[-1]:
         dataset = 'pitts250k'
@@ -81,14 +85,19 @@ def parse_dbStruct(path):
 
     whichSet = matStruct[0].item()
 
-    dbImage = [f[0].item() for f in matStruct[1]]
+    dbImage = [f[0].item() for f in matStruct[1][:20]]
     utmDb = matStruct[2].T
 
-    qImage = [f[0].item() for f in matStruct[3]]
+    qImage = [f[0].item() for f in matStruct[3][:5]]
     utmQ = matStruct[4].T
+
+    dbImage = qImage
 
     numDb = matStruct[5].item()
     numQ = matStruct[6].item()
+    
+    numDb = 20
+    numQ = 5
 
     posDistThr = matStruct[7].item()
     posDistSqThr = matStruct[8].item()
