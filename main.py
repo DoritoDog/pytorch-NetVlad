@@ -4,10 +4,12 @@ from math import log10, ceil
 import random, shutil, json
 from os.path import join, exists, isfile, realpath, dirname
 from os import makedirs, remove, chdir, environ
+from distance import compute_dist
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.transforms.functional as fun
 import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -168,6 +170,31 @@ def train(epoch):
             flush=True)
     writer.add_scalar('Train/AvgLoss', avg_loss, epoch)
 
+# Not used anywhere, but useful to remember how the arguments to compute_dist() should be.
+def demonstrate_compute_dist():
+  q = np.array([[1,2,3,4,5,6,7,8,9]])
+  db = np.array([[1,2,3,4,5,6,7,8,9], [10,20,30,40,50,60,70,80,90], [100,200,300,400,500,600,700,800,900]])
+  d = compute_dist(db, db)
+  print(d)
+
+# Use this at the beginning of test() to try the model on a few of your own images. They should be in your Google Drive, in a folder
+# called "Indoor localization images" and go from 0.jpg to n.jpg.
+def test_on_custom_images(eval_set):
+    pool_size = encoder_dim
+    if opt.pooling.lower() == 'netvlad': pool_size *= opt.num_clusters
+    db = np.empty((len(eval_set), pool_size))
+    for i in range(0, 5):
+        im = Image.open('/content/drive/MyDrive/Indoor localization images/' + str(i) + '.jpg')
+        im.resize((480, 640))
+        tensor = fun.pil_to_tensor(im).float().reshape((1, 3, 1616, 3264))
+        input = fun.normalize(tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        input = input.to(device)
+        image_encoding = model.encoder(input)
+        vlad_encoding = model.pool(image_encoding)
+        db[i, :] = vlad_encoding.detach().cpu().numpy()
+    q = np.array([db[0].astype('float32')])
+    print(compute_dist(q, db))
+
 def test(eval_set, epoch=0, write_tboard=False):
     # TODO what if features dont fit in memory? 
     test_data_loader = DataLoader(dataset=eval_set, 
@@ -175,6 +202,7 @@ def test(eval_set, epoch=0, write_tboard=False):
                 pin_memory=cuda)
 
     model.eval()
+    # Loops through test_data_loader and populates dbFeat with features.
     with torch.no_grad():
         print('====> Extracting Features')
         pool_size = encoder_dim
@@ -182,15 +210,15 @@ def test(eval_set, epoch=0, write_tboard=False):
         dbFeat = np.empty((len(eval_set), pool_size))
 
         # iteration is the index of the iteration.
-        # input has the shape [24, 3, 480, 640].
-        # indices is tensor([ 0, 1, 2, ... 23]).
+        # indices is a tensor([ 0, 1, 2, ... 23]).
         for iteration, (input, indices) in enumerate(test_data_loader, 1):
+            # input.shape is [indices, 3, 480, 640].
             input = input.to(device)
             image_encoding = model.encoder(input)
-            vlad_encoding = model.pool(image_encoding) 
+            vlad_encoding = model.pool(image_encoding)
 
-            # dbFeat has the shape (16816, 32768).
-            # dbFeat[indices.detach().numpy(), :] has the shape (24, 32768)
+            # dbFeat.shape is (16816, 32768).
+            # dbFeat[indices.detach().numpy(), :] has the shape (indices, 32768)
             dbFeat[indices.detach().numpy(), :] = vlad_encoding.detach().cpu().numpy()
             if iteration % 50 == 0 or len(test_data_loader) <= 10:
                 print("==> Batch ({}/{})".format(iteration, 
@@ -200,11 +228,10 @@ def test(eval_set, epoch=0, write_tboard=False):
     del test_data_loader
 
     # extracted for both db and query, now split in own sets
-    #qFeat = dbFeat[eval_set.dbStruct.numDb:].astype('float32')
-    #dbFeat = dbFeat[:eval_set.dbStruct.numDb].astype('float32')
-    qFeat = dbFeat.astype('float32')
-    dbFeat = dbFeat.astype('float32')
-    
+    # dbFeat contains 16816, qFeat contains 6816, dbFeat contains 10000.
+    qFeat = dbFeat[eval_set.dbStruct.numDb:].astype('float32')
+    dbFeat = dbFeat[:eval_set.dbStruct.numDb].astype('float32')
+
     print('====> Building faiss index')
     faiss_index = faiss.IndexFlatL2(pool_size)
     faiss_index.add(dbFeat)
@@ -212,10 +239,10 @@ def test(eval_set, epoch=0, write_tboard=False):
     print('====> Calculating recall @ N')
     n_values = [1,5,10,20]
 
-    _, predictions = faiss_index.search(qFeat, max(n_values)) 
+    _, predictions = faiss_index.search(qFeat, max(n_values))
 
     # for each query get those within threshold distance
-    gt = eval_set.getPositives() 
+    gt = eval_set.getPositives()
 
     correct_at_n = np.zeros(len(n_values))
     #TODO can we do this on the matrix in one go?
