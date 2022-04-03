@@ -60,7 +60,7 @@ parser.add_argument('--patience', type=int, default=10, help='Patience for early
 parser.add_argument('--dataset', type=str, default='pittsburgh', 
         help='Dataset to use', choices=['pittsburgh'])
 parser.add_argument('--arch', type=str, default='vgg16', 
-        help='basenetwork to use', choices=['vgg16', 'alexnet'])
+        help='basenetwork to use', choices=['vgg16', 'alexnet', 'mobilenetv2'])
 parser.add_argument('--vladv2', action='store_true', help='Use VLAD v2')
 parser.add_argument('--pooling', type=str, default='netvlad', help='type of pooling to use',
         choices=['netvlad', 'max', 'avg'])
@@ -428,6 +428,19 @@ if __name__ == "__main__":
 
         if pretrained:
             # if using pretrained then only train conv5_1, conv5_2, and conv5_3
+            for l in layers[:-5]: 
+                for p in l.parameters():
+                    p.requires_grad = False
+
+    elif opt.arch.lower() == 'mobilenetv2':
+        encoder_dim = 1280
+        encoder = models.mobilenet_v2(pretrained=pretrained)
+        # capture only feature part and remove last relu and batchnorm
+        layers = list(encoder.features.modules())[:-2]
+
+        if pretrained:
+            # if using pretrained then only train conv5_1, conv5_2, and conv5_3
+            # (the last three conv layers)
             for l in layers[:-5]: 
                 for p in l.parameters():
                     p.requires_grad = False
