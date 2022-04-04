@@ -435,8 +435,7 @@ if __name__ == "__main__":
     elif opt.arch.lower() == 'mobilenetv2':
         encoder_dim = 1280
         encoder = models.mobilenet_v2(pretrained=pretrained)
-        # capture only feature part and remove last relu and batchnorm
-        layers = list(encoder.features.modules())[:-2]
+        layers = list(encoder.features.children())
 
         if pretrained:
             # if using pretrained then only train conv5_1, conv5_2, and conv5_3
