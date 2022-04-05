@@ -266,8 +266,8 @@ def get_clusters(cluster_set):
     nDescriptors = 50000
     nPerImage = 100
     nIm = ceil(nDescriptors/nPerImage)
-
-    sampler = SubsetRandomSampler(np.random.choice(len(cluster_set), nIm, replace=False))
+    replace = nIm > len(cluster_set)
+    sampler = SubsetRandomSampler(np.random.choice(len(cluster_set), nIm, replace=replace))
     data_loader = DataLoader(dataset=cluster_set, 
                 num_workers=opt.threads, batch_size=opt.cacheBatchSize, shuffle=False, 
                 pin_memory=cuda,
