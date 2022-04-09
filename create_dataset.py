@@ -32,7 +32,7 @@ def setDbStructImages(isDatabase):
 
   images_dir = opt.database_images_path if isDatabase else opt.query_images_path
   image_file_names = os.listdir(images_dir)
-  for i in range(1, num + 1):
+  for i in range(1, size + 1):
     image_file_name = os.path.join(images_dir, image_file_names[i])
 
     # '<U' denotes a little endian string.
@@ -42,11 +42,8 @@ def setDbStructImages(isDatabase):
 mat['dbStruct'][0][0][5][0][0] = opt.result_database_size
 mat['dbStruct'][0][0][6][0][0] = opt.result_queries_size
 
-mat['dbStruct'][0][0][2] = np.ones((2, 10))
-mat['dbStruct'][0][0][4] = np.ones((2, 10))
-
-setImages(True)
-setImages(False)
+setDbStructImages(True)
+setDbStructImages(False)
 savemat('/content/pytorch-NetVlad/datasets/pitts30k_train.mat', mat)
 savemat('/content/pytorch-NetVlad/datasets/pitts30k_val.mat', mat)
 print(mat)
